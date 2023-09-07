@@ -1,7 +1,14 @@
-const express = require('express')
-const app = express()
-app.all('/', (req, res) => {
-    console.log("Just got a request!")
-    res.send('Yo!')
-})
-app.listen(process.env.PORT || 3000)
+'use strict';
+
+const express = require('express');
+const workshopRouter = require('./routes/workshop.js');
+const app = express();
+
+// middleware
+app.use(express.json());
+
+// routes
+app.use('/api/workshop', workshopRouter);
+    
+// start server
+app.listen(process.env.PORT || 3000);
