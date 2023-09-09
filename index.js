@@ -9,7 +9,7 @@ const app = express();
 // middleware
 app.use(express.json());
 app.use(cors({
-    allowedHeaders: ["GET", "POST", "PUT", "DELETE"],
+    allowedHeaders: ["Content-Type"],
     origin: ["http://localhost:5174", "https://henger.studio", "https://admin.henger.studio"]
 }));
 
