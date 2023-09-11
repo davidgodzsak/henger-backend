@@ -72,7 +72,7 @@ router.delete('/:id', async (req, res) => {
     await client.send(command)
         .catch(e => res.status(500).json({ message: "Could not save the workshop change!", error: e }));
 
-    res.status(201).json({ message: "Added workshop!" })
+    res.status(201).json({ message: "Deleted workshop!" })
 })
 
 // helpers
