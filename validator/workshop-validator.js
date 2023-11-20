@@ -11,17 +11,17 @@ const workshopSchema = {
         name: { type: "string", minLength: 3 },
         insta: { type: "string", format: "url", minLength: 3 },
         shortDescription: { type: "string", minLength: 10, maxLength: 160 },
-        cover: { type: "string", format: "url", minLength: 3 },
+        description: { type: "string", minLength: 160 },
+        cover: { type: "string" },
         price: { type: "string" },
         level: { type: "string" },
-        description: { type: "string", minLength: 3 },
         date: { type: "string", format: "date" },
-        startTime: { type: "string" },
-        endTime: { type: "string" },
-        rsvp: { type: "string", format: "url", minLength: 3 },
-        gallery: { type: "array", items: { type: "string", format: "url", minLength: 3 } },
+        startTime: { type: "string", format: "time" },
+        endTime: { type: "string", format: "time" },
+        rsvp: { type: "string", minLength: 3 },
+        gallery: { type: "array", items: { type: "string" } },
     },
-    required: ["title", "name", "shortDescription", "price", "date", "startTime", "endTime", "rsvp"]
+    required: ["title", "name", "shortDescription", "price", "date", "startTime", "endTime", "rsvp", "cover"]
 }
 
 const validate = ajv.compile(workshopSchema)
