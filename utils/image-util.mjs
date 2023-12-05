@@ -1,12 +1,12 @@
-const sharp = require("sharp");
-const { randomUUID } = require('crypto');
-const { PutObjectCommand, DeleteObjectCommand } = require("@aws-sdk/client-s3");
-const s3Client = require('./s3-client')
+import sharp from "sharp";
+import { randomUUID } from 'crypto';
+import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import send from './s3-client.mjs';
 
 const BUCKET_NAME = process.env.BUCKET_NAME;
 const UPLOAD_PATH = 'upload';
 
-async function dataUrlToWebp(dataUrlImage) {
+export async function dataUrlToWebp(dataUrlImage) {
     const base64image = dataUrlImage.substr(dataUrlImage.indexOf('base64') + 7)
     const imageBuffer = Buffer.from(base64image, 'base64')
     const fileName = `${randomUUID()}.webp`;
@@ -21,11 +21,11 @@ async function dataUrlToWebp(dataUrlImage) {
 
 const imageS3Request = (filename, body) => ({ Bucket: BUCKET_NAME, Key: `${UPLOAD_PATH}/${filename}`, Body: body });
 
-async function uploadToS3({ fileName, image }) {
+export async function uploadToS3({ fileName, image }) {
     const command = new PutObjectCommand(imageS3Request(fileName, image));
 
     try {
-        await s3Client.send(command)
+        await send(command)
     } catch {
         throw new Error({ message: "Could not save the image!", error: e });
     }
@@ -33,19 +33,17 @@ async function uploadToS3({ fileName, image }) {
     return UPLOAD_PATH + "/" + fileName;
 }
 
-async function uploadManyToS3(items) {
+export async function uploadManyToS3(items) {
     return await Promise.all(items.map(it => uploadToS3(it)))
 }
 
-async function deleteImage(path) {
+export async function deleteImage(path) {
     const command = new DeleteObjectCommand({Bucket: BUCKET_NAME, Key: path});
     try {
-        await s3Client.send(command)
+        await send(command)
     } catch {
         throw new Error({ message: "Could not save the image!", error: e });
     }
 
     return true
 }
-
-module.exports = { dataUrlToWebp, uploadToS3, uploadManyToS3 };

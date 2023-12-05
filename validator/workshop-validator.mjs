@@ -1,5 +1,5 @@
-const Ajv = require("ajv");
-const addFormats = require("ajv-formats");
+import Ajv from "ajv";
+import addFormats from "ajv-formats";
 
 const ajv = new Ajv({ allErrors: true });
 addFormats(ajv, ["date", "time", "url"]);
@@ -26,4 +26,4 @@ const workshopSchema = {
 
 const validate = ajv.compile(workshopSchema)
 
-module.exports = validate;
+export default validate;
