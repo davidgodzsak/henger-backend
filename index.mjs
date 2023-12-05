@@ -3,9 +3,10 @@
 import "./load-env.mjs";
 import express from 'express';
 import cors from 'cors';
-import { expressjwt } from "express-jwt";
+import authRouter from './routes/auth.mjs';
 import workshopRouter from './routes/workshop.mjs';
 import userRouter from './routes/user.mjs';
+import bcrypt from 'bcrypt';
 
 const app = express();
 
@@ -17,6 +18,7 @@ app.use(cors({
 }));
 
 // routes
+app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
 app.use('/api/workshops', workshopRouter);
 

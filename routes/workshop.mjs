@@ -29,7 +29,7 @@ router.get('/', async (_, res) => {
 })
 
 // todo protect
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', async (req, res) => {
     // validate if they sent a workshop
     if (!validateWorkshop(req.body)) {
         return res.status(400).json({ message: "Not a workshop" });
@@ -66,7 +66,7 @@ router.post('/', requireAuth, async (req, res) => {
     res.status(201).json({ message: "Added workshop!" })
 })
 
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', async (req, res) => {
     const workshops = await getWorkshopsFromAws()
         .catch(e => res.status(500).json({ message: "Could not load existing workshops!", error: e }));
 
@@ -85,7 +85,7 @@ router.put('/:id', requireAuth, async (req, res) => {
 })
 
 
-router.delete('/:id',requireAuth,  async (req, res) => {
+router.delete('/:id',  async (req, res) => {
     const workshops = await getWorkshopsFromAws()
         .catch(e => res.status(500).json({ message: "Could not load existing workshops!", error: e }));
     const workshopsChanged = JSON.stringify(workshops.filter(it => it.id !== req.params.id))
