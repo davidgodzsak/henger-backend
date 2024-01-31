@@ -14,7 +14,7 @@ const userSchema = {
         active: { type: "boolean", default: true },
         startedAt: { type: "string", format: "date" },
         days: { type: "array", uniqueItems: true, items: { type: "string", enum: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'] } },
-        groups: { type: "array", uniqueItems: true, items: { type: "string", enum: ['workshops', 'members', 'bills', 'settings'] } },
+        groups: { type: "array", uniqueItems: true, items: { type: "string", enum: ['workshops', 'members', 'invoices', 'settings'] } },
         comments: { type: "array", items: { type: "string" } }
     },
     required: ["name", "pin", "email", "monthlyFee", "days", "startedAt"]

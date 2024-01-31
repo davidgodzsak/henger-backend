@@ -6,7 +6,6 @@ import cors from 'cors';
 import authRouter from './routes/auth.mjs';
 import workshopRouter from './routes/workshop.mjs';
 import userRouter from './routes/user.mjs';
-import bcrypt from 'bcrypt';
 
 const app = express();
 

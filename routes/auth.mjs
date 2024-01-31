@@ -16,8 +16,10 @@ router.post('/login', async (req, res) => {
 });
 
 router.post('/update-pass', async (req, res) => {
-    if (await validateOTP(req.body.email, req.body.otp)) {
-        await setNewPassword(req.body.email, req.body.password);
+    const {email, otp, password} = req.body;
+    if (await validateOTP(email, otp)) {
+        await setNewPassword(email,password);
+        const user = await findUserByEmail(email);
         res.json({ accessToken: jwtToken(user) });
     } else {
         res.status(401).send('Invalid OTP or OTP not requested!');

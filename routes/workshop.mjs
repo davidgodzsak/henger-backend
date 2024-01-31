@@ -1,31 +1,25 @@
 // 'use strict';
 
 import { Router } from 'express';
-import { randomUUID } from 'crypto';
-import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { dataUrlToWebp, uploadToS3, uploadManyToS3 } from '../utils/image-util.mjs';
-import send from '../utils/s3-client.mjs';
+import { dataUrlToWebp, uploadToS3, uploadManyToS3, deleteImage } from '../utils/image-util.mjs';
 import validateWorkshop from '../validator/workshop-validator.mjs';
 import { getCollection } from '../utils/db.mjs';
+import { ObjectId } from 'mongodb';
 
-const BUCKET_NAME = process.env.BUCKET_NAME;
-const DB_PATH = 'db';
 const HENGER_URL = 'https://henger.studio/'
+const WORKSHOP_COLLECION_NAME = "Workshop";
 
 const router = Router();
-
-const WORKSHOP_COLLECION_NAME = "Workshop";
-const workshopS3Request = { Bucket: BUCKET_NAME, Key: `${DB_PATH}/workshops_dev.json` };
 
 // todo use direct read of workshops file in FE
 router.get('/', async (_, res) => {
     try {
         const collection = getCollection(WORKSHOP_COLLECION_NAME);
-        const result = await collection.insertOne(req.body);
-        res.status(201).json(result);
-      } catch (e) {
+        const result = await collection.find().toArray();
+        res.status(200).json(result);
+    } catch (e) {
         res.status(500).json({ error: e.message });
-      }
+    }
 })
 
 // todo protect
@@ -35,76 +29,82 @@ router.post('/', async (req, res) => {
         return res.status(400).json({ message: "Not a workshop" });
     }
 
-    // load existing workshops
-    let workshops;
-    try {
-        workshops = await getWorkshopsFromAws();
-    } catch (e) {
-        return res.status(500).json({ message: "Could not load existing workshops!", error: e });
-    }
-
     // upload images
     let coverUrl;
     let galleryUrls;
     try {
         coverUrl = await uploadToS3(await dataUrlToWebp(req.body.cover));
         galleryUrls = await uploadManyToS3(await Promise.all(req.body.gallery.map(it => dataUrlToWebp(it))));
-    } catch {
+    } catch (e) {
         return res.status(500).json({ message: "Cold not save images", error: e });
     }
 
     // save workshop
     try {
-        const workshop = { id: randomUUID(), ...req.body, cover: HENGER_URL + coverUrl, gallery: galleryUrls.map(it => HENGER_URL + it) }
-        const props = { Body: JSON.stringify([...workshops, workshop]), ...workshopS3Request };
-        const command = new PutObjectCommand(props);
-        await send(command)
+        const workshop = { ...req.body, cover: HENGER_URL + coverUrl, gallery: galleryUrls.map(it => HENGER_URL + it) }
+        const collection = getCollection(WORKSHOP_COLLECION_NAME);
+        collection.insertOne(workshop);
+        return res.status(201).json({ message: "Workshop created!" });
     } catch (e) {
         return res.status(500).json({ message: "Could not save the workshop!", error: e })
     }
-
-    res.status(201).json({ message: "Added workshop!" })
 })
 
 router.put('/:id', async (req, res) => {
-    const workshops = await getWorkshopsFromAws()
-        .catch(e => res.status(500).json({ message: "Could not load existing workshops!", error: e }));
+    const collection = getCollection(WORKSHOP_COLLECION_NAME);
+    const old = await collection.findOne({ _id: new ObjectId(req.params.id) })
 
-    const editedWorkshop = req.body;
+    if (!old) {
+        return res.status(404).json({ message: "Workshop does not exist!" })
+    }
 
-    // todo store new pictures
-    // delete old pictures
+    // delete old images and upload new ones
+    let coverUrl;
+    let galleryUrls;
+    try {
+        if (req.body.cover.startsWith('data:')) {
+            if (old.cover) { await deleteImage(old.cover.replace(HENGER_URL, "")) }
+            coverUrl = HENGER_URL + (await uploadToS3(await dataUrlToWebp(req.body.cover)));
+        }
 
-    const workshopsChanged = workshops.map(workshop => workshop.id == editedWorkshop.id ? editedWorkshop : workshop)
+        Promise.all(old.gallery.filter(it => !req.body.gallery.includes(it)).map(async it => await deleteImage(it.replace(HENGER_URL, ""))))
+        galleryUrls = await Promise.all(req.body.gallery.map(async it => {
+            if (it.startsWith('data:')) {
+                return  HENGER_URL + (await uploadToS3(await dataUrlToWebp(it)));
+            }
+            return it
+        }));
+    } catch (e) {
+        console.log(e);
+        return res.status(500).json({ message: "Cold not save images", error: e });
+    }
 
-    const command = new PutObjectCommand({ Body: workshopsChanged, ...workshopS3Request });
-    await send(command)
-        .catch(e => res.status(500).json({ message: "Could not save the workshop change!", error: e }));
+    const { _id, ...workshopData } = req.body;
+    const workshopDataTransformed = { ...workshopData, cover: coverUrl, gallery: galleryUrls }
 
-    res.status(200).json({ message: "Edited workshop!" })
+    const workshop = await collection.updateOne(
+        { _id: new ObjectId(req.params.id) },
+        { $set: workshopDataTransformed }
+    );
+
+    if (!workshop) {
+        return res.status(404).json({ message: "Workshop does not exist!" })
+    }
+
+    return res.status(200).json({ message: "Edited workshop!" })
 })
 
 
-router.delete('/:id',  async (req, res) => {
-    const workshops = await getWorkshopsFromAws()
-        .catch(e => res.status(500).json({ message: "Could not load existing workshops!", error: e }));
-    const workshopsChanged = JSON.stringify(workshops.filter(it => it.id !== req.params.id))
-
-    // todo delete all images for the workshop
-
-    const command = new PutObjectCommand({ Body: workshopsChanged, ...workshopS3Request });
-    await send(command)
-        .catch(e => res.status(500).json({ message: "Could not save the workshop change!", error: e }));
-
+router.delete('/:id', async (req, res) => {
+    let collection = getCollection(WORKSHOP_COLLECION_NAME);
+    const workshop = await collection.deleteOne({ _id: new ObjectId(req.params.id) });
+    if (!workshop) {
+        return res.status(404).json({ message: "Workshop does not exist!" })
+    }
     res.status(200).json({ message: "Deleted workshop!" })
 })
 
-// helpers
-async function getWorkshopsFromAws() {
-    const command = new GetObjectCommand(workshopS3Request);
-    const response = await send(command);
-    const bodyString = await response.Body.transformToString();
-    return JSON.parse(bodyString)
-}
 
 export default router;
+
+// todo make a workshop-repository for data layer

@@ -1,7 +1,7 @@
 import sharp from "sharp";
 import { randomUUID } from 'crypto';
 import { PutObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
-import send from './s3-client.mjs';
+import client from "./s3-client.mjs";
 
 const BUCKET_NAME = process.env.BUCKET_NAME;
 const UPLOAD_PATH = 'upload';
@@ -25,8 +25,9 @@ export async function uploadToS3({ fileName, image }) {
     const command = new PutObjectCommand(imageS3Request(fileName, image));
 
     try {
-        await send(command)
-    } catch {
+        await client.send(command)
+    } catch  (e) {
+        console.log(e);
         throw new Error({ message: "Could not save the image!", error: e });
     }
 
@@ -40,9 +41,9 @@ export async function uploadManyToS3(items) {
 export async function deleteImage(path) {
     const command = new DeleteObjectCommand({Bucket: BUCKET_NAME, Key: path});
     try {
-        await send(command)
-    } catch {
-        throw new Error({ message: "Could not save the image!", error: e });
+        await client.send(command)
+    } catch(e) {
+        throw new Error({ message: "Could not delete the image!", error: e });
     }
 
     return true

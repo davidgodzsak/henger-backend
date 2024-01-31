@@ -19,7 +19,7 @@ export async function findUserByEmail(email) {
 
 export async function validateAndGetUser(email, pass) {
     const user = await findUserByEmail(email)
-    if(!user) {
+    if(!user || !user.hashedPassword) {
         return { success: false, user: null }
     }
     
