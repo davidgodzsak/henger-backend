@@ -23,4 +23,5 @@ app.use('/api/workshops', workshopRouter);
 
 // start server
 console.log('Starting on port 3000')
+// todo: this should be invoked inside the client.connect of mongodb!! to ensure server is started just after db
 app.listen(process.env.PORT || 3000, () => { console.log("Server running!") });

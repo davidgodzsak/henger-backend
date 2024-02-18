@@ -22,6 +22,19 @@ router.get('/', async (_, res) => {
     }
 })
 
+router.get('/display', async (_, res) => {
+    try {
+        const collection = getCollection(WORKSHOP_COLLECION_NAME);
+        const result = await collection.find({
+            date: { $gte: new Date().toISOString() },
+            active: true
+        }).toArray();
+        res.status(200).json(result);
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+})
+
 // todo protect
 router.post('/', async (req, res) => {
     // validate if they sent a workshop
