@@ -5,11 +5,13 @@ import { dataUrlToWebp, uploadToS3, uploadManyToS3, deleteImage } from '../utils
 import validateWorkshop from '../validator/workshop-validator.mjs';
 import { getCollection } from '../utils/db.mjs';
 import { ObjectId } from 'mongodb';
+import apicache from 'apicache';
 
 const HENGER_URL = 'https://henger.studio/'
 const WORKSHOP_COLLECION_NAME = "Workshop";
 
 const router = Router();
+const cache = apicache.middleware
 
 // todo use direct read of workshops file in FE
 router.get('/', async (_, res) => {
@@ -22,7 +24,7 @@ router.get('/', async (_, res) => {
     }
 })
 
-router.get('/display', async (_, res) => {
+router.get('/display', cache('2 minutes'), async (_, res) => {
     try {
         const collection = getCollection(WORKSHOP_COLLECION_NAME);
         const result = await collection.find({
