@@ -6,6 +6,7 @@ import cors from 'cors';
 import authRouter from './routes/auth.mjs';
 import workshopRouter from './routes/workshop.mjs';
 import userRouter from './routes/user.mjs';
+import invoiceRouter from './routes/invoice.mjs';
 
 const app = express();
 
@@ -20,6 +21,7 @@ app.use(cors({
 app.use('/api/auth', authRouter);
 app.use('/api/users', userRouter);
 app.use('/api/workshops', workshopRouter);
+app.use('/api/invoices', invoiceRouter);
 
 // start server
 console.log('Starting on port 3000')
