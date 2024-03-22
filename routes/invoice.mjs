@@ -18,10 +18,9 @@ const purchaseDetails = [
 ]
 
 const router = Router();
-
 router.get('/prepare', async (_, res) => {
     try {
-        const collection = getCollection(PURCHASE_COLLECION_NAME);
+        const collection = getCollection(USER_COLLECION_NAME);
         // this is heavy stuff
         const purchases = await collection.aggregate(aggregation).toArray();
         res.status(200).json(purchases);
@@ -42,15 +41,19 @@ function facetItems(purchaseDetailNames) {
                 [curr]: [
                     {
                     '$match': {
-                        'detail.typeName': curr
+                      '$or': [
+                        {'purchase': {}},
+                        {'purchase': {'$exists': false}},
+                        {'purchase.detail.typeName': curr}
+                      ]
                     }
                     }, 
                     {
                     '$lookup': {
                         'from': curr, 
-                        'localField': 'detail._id', 
+                        'localField': 'purchase.detail._id', 
                         'foreignField': '_id', 
-                        'as': 'detail2'
+                        'as': 'purchase.detail2'
                     }
                     }
                 ]
@@ -62,17 +65,38 @@ function facetItems(purchaseDetailNames) {
 
 const aggregation = [
     {
-      '$match': { 'isBilled': false, 'markedDeleted': false }
+      '$match': {
+        'active': true
+      }
+    },
+    {
+      '$lookup': {
+        'from': 'Purchase', 
+        'localField': '_id', 
+        'foreignField': 'userId', 
+        'as': 'purchase'
+      }
+    },
+    {
+      '$unwind': {'path':'$purchase', 'preserveNullAndEmptyArrays': true }
+    },
+    {
+      '$match': {
+        '$or': [
+            { 'purchase': {'$exists': false }},  
+            { 'purchase.isBilled': false, 'purchase.markedDeleted': false }
+          ]
+        }
     },
     {
       '$lookup': {
         'from': 'AnyPurchaseDetail', 
-        'localField': 'detail', 
+        'localField': 'purchase.detail', 
         'foreignField': '_id', 
-        'as': 'detail'
+        'as': 'purchase.detail'
       }
     }, 
-    { '$unwind': '$detail' }, 
+    { '$unwind': { 'path': '$purchase.detail', 'preserveNullAndEmptyArrays': true }}, 
     { '$facet': facetItems(purchaseDetails) }, 
     {
       '$project': {
@@ -85,26 +109,150 @@ const aggregation = [
     {
       '$replaceRoot': { 'newRoot': '$allDetails' }
     }, 
-    {'$unwind': '$detail2'},
-    { '$addFields': { 'detail': { '$mergeObjects': ["$detail", "$detail2"] } } },
+    {'$unwind': {'path': '$purchase.detail2', 'preserveNullAndEmptyArrays': true }},
+    { '$addFields': { 'purchase.detail': { '$mergeObjects': ["$purchase.detail", "$purchase.detail2"] } } },
     { '$unset': 'detail2' },
     {
       '$group': {
-        '_id': '$userId', 
+        '_id': {'year': {'$year': '$purchase.date'}, 'month': {'$month': '$purchase.date'}, 'user': {'_id': '$_id', 'name': '$name', 'pin': '$pin', 'monthlyFee': '$monthlyFee'} },
         'purchases': {
-          '$push': { '_id': '$_id', 'date': '$date', 'price': '$price', 'detail': '$detail', 'markedDeleted': '$markedDeleted' }
+          '$push': { '_id': '$purchase._id', 'date': '$purchase.date', 'price': '$purchase.price', 'detail': '$purchase.detail', 'markedDeleted': '$purchase.markedDeleted' }
         }, 
-        'total': { '$sum': '$price' }
+        'total': { '$sum': '$purchase.price' }
       }
-    }, 
+    },
     {
-      '$lookup': {
-        'from': USER_COLLECION_NAME, 
-        'localField': '_id', 
-        'foreignField': '_id', 
-        'as': 'user'
-      }
-    }, 
-    { '$unwind': '$user' },
+     '$project': { 
+        "_id": 0, "year": "$_id.year", "month": "$_id.month", "user": "$_id.user", "purchases": 1, "total": 1 }
+    },
     { '$sort': { 'user.name': 1 } }
+  ]
+
+
+  // const asd = [
+  //   {
+  //     $match: {
+  //       active: true,
+  //       name: "Dávid",
+  //     },
+  //   },
+  //   {
+  //     $lookup: {
+  //       from: "Purchase",
+  //       localField: "_id",
+  //       foreignField: "userId",
+  //       as: "purchase",
+  //     },
+  //   },
+  //   {
+  //     $unwind: {
+  //       path: "$purchase",
+  //       preserveNullAndEmptyArrays: true,
+  //     },
+  //   },
+  //   {
+  //     $match: {
+  //       $or: [
+  //         {
+  //           purchase: {
+  //             $exists: false,
+  //           },
+  //         },
+  //         {
+  //           "purchase.isBilled": false,
+  //           "purchase.markedDeleted": false,
+  //         },
+  //       ],
+  //     },
+  //   },
+  //   {
+  //     $lookup: {
+  //       from: "AnyPurchaseDetail",
+  //       localField: "purchase.detail",
+  //       foreignField: "_id",
+  //       as: "purchase.detail",
+  //     },
+  //   },
+  //   {
+  //     $unwind: {
+  //       path: "$purchase.detail",
+  //       preserveNullAndEmptyArrays: true,
+  //     },
+  //   },
+  //   { '$facet': facetItems(purchaseDetails) }, 
+  //   {
+  //     '$project': {
+  //       'allDetails': {
+  //         '$setUnion': purchaseDetails.map(purchaseDetailName => `$${purchaseDetailName}`)
+  //       }
+  //     }
+  //   },
+    {
+      $unwind: "$allDetails",
+    },
+    {
+      $replaceRoot: {
+        newRoot: "$allDetails",
+      },
+    },
+    {
+      $unwind: {
+        path: "$purchase.detail2",
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    {
+      $addFields: {
+        "purchase.detail": {
+          $mergeObjects: [
+            "$purchase.detail",
+            "$purchase.detail2",
+          ],
+        },
+      },
+    },
+    {
+      $unset: "purchase.detail2",
+    },
+    {
+      $group: {
+        _id: {
+          year: {
+            $year: "$purchase.date",
+          },
+          user: {
+            _id: "$_id",
+            name: "$name",
+            pin: "$pin",
+            monthlyFee: "$monthlyFee",
+          },
+          month: {
+            $month: "$purchase.date",
+          },
+        },
+        purchases: {
+          $push: {
+            _id: "$purchase._id",
+            date: "$purchase.date",
+            price: "$purchase.price",
+            detail: "$purchase.detail",
+            markedDeleted:
+              "$purchase.markedDeleted",
+          },
+        },
+        total: {
+          $sum: "$purchase.price",
+        },
+      },
+    },
+    {
+      $project: {
+        _id: 0,
+        year: "$_id.year",
+        month: "$_id.month",
+        user: "$_id.user",
+        purchases: 1,
+        total: 1,
+      },
+    },
   ]
