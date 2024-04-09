@@ -11,7 +11,10 @@ const client = new MongoClient(uri, {
   }
 });
 
+export const session = client.startSession();
+
 let conn;
+
 try {
   console.log('Connecting to db...')
   conn = await client.connect();

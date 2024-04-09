@@ -1,10 +1,9 @@
 // 'use strict';
 
 import { Router } from 'express';
-import { getCollection } from '../utils/db.mjs';
+import { getCollection, session } from '../utils/db.mjs';
 import { ObjectId } from 'mongodb';
 
-const HENGER_URL = 'https://henger.studio/'
 const INVOICE_COLLECION_NAME = "Invoice";
 const PURCHASE_COLLECION_NAME = "Purchase";
 const USER_COLLECION_NAME = "User";
@@ -17,6 +16,12 @@ const purchaseDetails = [
     'WorkshopPurchaseDetail'
 ]
 
+const transactionOptions = {
+  readPreference: 'primary',
+  readConcern: { level: 'local' },
+  writeConcern: { w: 'majority' }
+};
+
 const router = Router();
 router.get('/prepare', async (_, res) => {
     try {
@@ -27,6 +32,30 @@ router.get('/prepare', async (_, res) => {
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
+})
+
+router.post('/finalize', async (req, res) => {
+  const {userId: userIdRaw, purchaseIds: purchaseIdsRaw} = req.body; // userId, purchaseIds
+  const userId = new ObjectId(userIdRaw);
+  const purchaseIds = purchaseIdsRaw.map(it => new ObjectId(it));
+
+  try {
+    await session.withTransaction(async () => {
+      // start transaction
+      const invoices = getCollection(INVOICE_COLLECION_NAME);
+      const purchases = getCollection(PURCHASE_COLLECION_NAME);
+      
+      const filter = { _id: { $in: purchaseIds } };
+
+      // TODO: test with David
+      await invoices.insertOne({ userId, purchaseIds }, { session });
+      await purchases.updateMany(filter, { $set: { isBilled: true }}, { session });
+    }, transactionOptions);
+    
+    res.status(200).send();
+} catch (e) {
+    res.status(500).json({ error: e.message });
+}
 })
 
 export default router;
@@ -187,72 +216,72 @@ const aggregation = [
   //       }
   //     }
   //   },
-    {
-      $unwind: "$allDetails",
-    },
-    {
-      $replaceRoot: {
-        newRoot: "$allDetails",
-      },
-    },
-    {
-      $unwind: {
-        path: "$purchase.detail2",
-        preserveNullAndEmptyArrays: true,
-      },
-    },
-    {
-      $addFields: {
-        "purchase.detail": {
-          $mergeObjects: [
-            "$purchase.detail",
-            "$purchase.detail2",
-          ],
-        },
-      },
-    },
-    {
-      $unset: "purchase.detail2",
-    },
-    {
-      $group: {
-        _id: {
-          year: {
-            $year: "$purchase.date",
-          },
-          user: {
-            _id: "$_id",
-            name: "$name",
-            pin: "$pin",
-            monthlyFee: "$monthlyFee",
-          },
-          month: {
-            $month: "$purchase.date",
-          },
-        },
-        purchases: {
-          $push: {
-            _id: "$purchase._id",
-            date: "$purchase.date",
-            price: "$purchase.price",
-            detail: "$purchase.detail",
-            markedDeleted:
-              "$purchase.markedDeleted",
-          },
-        },
-        total: {
-          $sum: "$purchase.price",
-        },
-      },
-    },
-    {
-      $project: {
-        _id: 0,
-        year: "$_id.year",
-        month: "$_id.month",
-        user: "$_id.user",
-        purchases: 1,
-        total: 1,
-      },
-    },
-  ]
+  //   {
+  //     $unwind: "$allDetails",
+  //   },
+  //   {
+  //     $replaceRoot: {
+  //       newRoot: "$allDetails",
+  //     },
+  //   },
+  //   {
+  //     $unwind: {
+  //       path: "$purchase.detail2",
+  //       preserveNullAndEmptyArrays: true,
+  //     },
+  //   },
+  //   {
+  //     $addFields: {
+  //       "purchase.detail": {
+  //         $mergeObjects: [
+  //           "$purchase.detail",
+  //           "$purchase.detail2",
+  //         ],
+  //       },
+  //     },
+  //   },
+  //   {
+  //     $unset: "purchase.detail2",
+  //   },
+  //   {
+  //     $group: {
+  //       _id: {
+  //         year: {
+  //           $year: "$purchase.date",
+  //         },
+  //         user: {
+  //           _id: "$_id",
+  //           name: "$name",
+  //           pin: "$pin",
+  //           monthlyFee: "$monthlyFee",
+  //         },
+  //         month: {
+  //           $month: "$purchase.date",
+  //         },
+  //       },
+  //       purchases: {
+  //         $push: {
+  //           _id: "$purchase._id",
+  //           date: "$purchase.date",
+  //           price: "$purchase.price",
+  //           detail: "$purchase.detail",
+  //           markedDeleted:
+  //             "$purchase.markedDeleted",
+  //         },
+  //       },
+  //       total: {
+  //         $sum: "$purchase.price",
+  //       },
+  //     },
+  //   },
+  //   {
+  //     $project: {
+  //       _id: 0,
+  //       year: "$_id.year",
+  //       month: "$_id.month",
+  //       user: "$_id.user",
+  //       purchases: 1,
+  //       total: 1,
+  //     },
+  //   },
+  // ]
