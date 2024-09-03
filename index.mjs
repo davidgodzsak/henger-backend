@@ -23,6 +23,9 @@ app.use('/api/users', userRouter);
 app.use('/api/workshops', workshopRouter);
 app.use('/api/invoices', invoiceRouter);
 
+app.get("/health", (_,res) => res.send())
+app.get("/ping", (_,res) => res.send("pong"))
+
 // start server
 console.log('Starting on port 3000')
 // todo: this should be invoked inside the client.connect of mongodb!! to ensure server is started just after db
